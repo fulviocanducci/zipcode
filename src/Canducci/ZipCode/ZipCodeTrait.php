@@ -1,6 +1,13 @@
-<?php namespace Canducci\ZipCode;
+<?php
 
-trait ZipCodeTrait {
+namespace Canducci\ZipCode;
+
+/**
+ * Trait ZipCodeTrait
+ * @package Canducci\ZipCode
+ */
+trait ZipCodeTrait
+{
 
     /**
      * Traits ZipCode
@@ -10,10 +17,8 @@ trait ZipCodeTrait {
      * @return Canducci\ZipCode\ZipCodeInfo
      * @throws Canducci\ZipCode\ZipCodeException
      */
-    public function zipcode($value, $renew = false)
+    public function zipcode($value, $renew = false): ZipCodeInfo
     {
-
         return zipcode($value, $renew);
-
     }
 }

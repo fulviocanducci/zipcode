@@ -1,9 +1,16 @@
-<?php namespace Canducci\ZipCode;
+<?php
+
+namespace Canducci\ZipCode;
 
 use Canducci\ZipCode\Contracts\ZipCodeInfoContract;
+use stdClass;
 
-
-class ZipCodeInfo implements ZipCodeInfoContract {
+/**
+ * Class ZipCodeInfo
+ * @package Canducci\ZipCode
+ */
+class ZipCodeInfo implements ZipCodeInfoContract
+{
 
     /**
      * @var string $valueJson
@@ -16,37 +23,29 @@ class ZipCodeInfo implements ZipCodeInfoContract {
      * @param string $valueJson
      * @throws ZipCodeException
      */
-    public function __construct($valueJson) 
+    public function __construct($valueJson)
     {
-
-        if (is_string($valueJson))
-        {
+        if (is_string($valueJson)) {
             $this->valueJson = $valueJson;
-            if ($this->json_validate_zipcode() === false)
-            {
-                throw new ZipCodeException( trans('canducci-zipcode::zipcode.invalid_json_zip') );
+            if ($this->json_validate_zipcode() === false) {
+                throw new ZipCodeException("JSON invalid");
             }
+        } else {
+            throw new ZipCodeException("Format invalid");
         }
-        else
-        {
-            throw new ZipCodeException( trans('canducci-zipcode::zipcode.invalid_format_type_string') );
-        }
-
     }
-
 
     /**
      * return JSON Javascript
      *
      * @return JSON Javascript
      */
-    public function getJson()
+    public function getJson(): string
     {
-        if (!is_null($this->valueJson))
-        {
-            return $this->valueJson;    
+        if (!empty($this->valueJson)) {
+            return $this->valueJson;
         }
-        return null;        
+        return null;
     }
 
     /**
@@ -54,19 +53,12 @@ class ZipCodeInfo implements ZipCodeInfoContract {
      *
      * @return Array
      */
-    public function getArray()
+    public function getArray(): array
     {
-
-        if (!is_null($this->valueJson))
-        {
-
-
-		    return json_decode($this->getJson(), true);
-
+        if (!empty($this->valueJson)) {
+            return json_decode($this->valueJson, true);
         }
-
         return null;
-
     }
 
     /**
@@ -74,54 +66,44 @@ class ZipCodeInfo implements ZipCodeInfoContract {
      *
      * @return \stdClass
      */
-    public function getObject()
+    public function getObject(): stdClass
     {
-
-        if (!is_null($this->valueJson))
-        {
-
-	   	    return json_decode($this->getJson(), false);
-
+        if (!empty($this->valueJson)) {
+            return json_decode($this->valueJson, false);
         }
-
         return null;
-
     }
-	
+
     /**     
      * validate zipcode format
      *
      * @return bool
      */
-    private function json_validate_zipcode() 
+    private function json_validate_zipcode(): bool
     {
-
-        if (is_string($this->valueJson)) 
-        {
-            $ret = @json_decode($this->valueJson, true);            
-            return (json_last_error() === JSON_ERROR_NONE && 
-                    isset($ret['cep']) &&
-                    isset($ret['logradouro']) &&
-                    isset($ret['complemento']) &&
-                    isset($ret['bairro']) &&
-                    isset($ret['localidade']) &&
-                    isset($ret['uf']) &&
-                    isset($ret['ibge']) &&
-                    isset($ret['gia']));
+        if (!empty($this->valueJson) && is_string($this->valueJson)) {
+            $ret = @json_decode($this->valueJson, true);
+            return (json_last_error() === JSON_ERROR_NONE &&
+                isset($ret['cep']) &&
+                isset($ret['logradouro']) &&
+                isset($ret['complemento']) &&
+                isset($ret['bairro']) &&
+                isset($ret['localidade']) &&
+                isset($ret['uf']) &&
+                isset($ret['ibge']) &&
+                isset($ret['gia'])) &&
+                isset($ret['ddd']) &&
+                isset($ret['siafi']);
         }
-
         return false;
-
     }
 
     /**
      * @return ZipCodeItem
      */
-    public function getZipCodeItem()
+    public function getZipCodeItem(): ZipCodeItem
     {
-
         $ret = $this->getArray();
-
         return new ZipCodeItem(
             $ret['cep'],
             $ret['logradouro'],
@@ -130,8 +112,9 @@ class ZipCodeInfo implements ZipCodeInfoContract {
             $ret['localidade'],
             $ret['uf'],
             $ret['ibge'],
-            $ret['gia']
+            $ret['gia'],
+            $ret['ddd'],
+            $ret['siafi']
         );
-
     }
 }

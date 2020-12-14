@@ -1,11 +1,18 @@
-<?php namespace Canducci\ZipCode;
+<?php
 
-use Illuminate\Cache\CacheManager;
-use GuzzleHttp\ClientInterface;
+namespace Canducci\ZipCode;
+
 use Canducci\ZipCode\Contracts\ZipCodeContract;
+use Canducci\ZipCode\Contracts\ZipCodeRequestContract;
+use PhpExtended\SimpleCache\SimpleCacheFilesystem;
 
-class ZipCode implements ZipCodeContract {
-    
+/**
+ * Class ZipCode
+ * @package Canducci\ZipCode
+ */
+class ZipCode implements ZipCodeContract
+{
+
     /**
      * @var $value
      */
@@ -17,160 +24,114 @@ class ZipCode implements ZipCodeContract {
     private $renew;
 
     /**
-     * @var $cacheManager (Illuminate\Cache\CacheManager)
+     * @var $cache
      */
-    private $cacheManager;
+    private $cache;
 
     /**
-     * @var $clientInterface (GuzzleHttp\ClientInterface)
+     * @var ZipCodeRequestContract
      */
-    private $clientInterface;
+    private $request;
 
     /**
      * Construct ZipCode
      *
-     * @param $cacheManager (Illuminate\Cache\CacheManager)
-     * @param $clientInterface (GuzzleHttp\ClientInterface)
+     * @param SimpleCacheFilesystem $cache 
+     * @param ZipCodeRequestContract $request
      */
-    public function __construct(CacheManager $cacheManager, ClientInterface $clientInterface)
+    public function __construct(SimpleCacheFilesystem $cache, ZipCodeRequestContract $request)
     {
-
-        $this->value           = '';
-        $this->renew           = false;
-        $this->cacheManager    = $cacheManager;        
-        $this->clientInterface = $clientInterface;
-
+        $this->value = '';
+        $this->renew = false;
+        $this->cache = $cache;
+        $this->request = $request;
     }
 
     /**
-     * return ZipCodeInfo
-     *
-     * @param string $value
+     * @param $value
      * @param bool $renew
-     * @return Canducci\ZipCode\ZipCodeInfo
+     * @return Canducci\ZipCode\ZipCodeInfo|ZipCodeInfo|null
      * @throws ZipCodeException
      */
-    public function find($value, $renew = false)
+    public function find(string $value, bool $renew = false): ?ZipCodeInfo
     {
         $message = '';
-        if (is_string($value))
-        {
+        if (is_string($value)) {
             $value = str_replace('.', '', $value);
             $value = str_replace('-', '', $value);
-            if (mb_strlen($value) === 8 && preg_match('/^(\d){8}$/', $value)) 
-            {
-                $this->value = $value;                
-            } 
-            else 
-            {
-                $message = trans('canducci-zipcode::zipcode.invalid_zip');
+            if (mb_strlen($value) === 8 && preg_match('/^(\d){8}$/', $value)) {
+                $this->value = $value;
+            } else {
+                $message = 'ZipCode invalid';
             }
-        } 
-        else
-        {
-            $message = trans('canducci-zipcode::zipcode.invalid_zip');
+        } else {
+            $message = 'ZipCode invalid';
         }
-
-        if (is_bool($renew))
-        {
+        if (is_bool($renew)) {
             $this->renew = $renew;
-        } 
-        else 
-        {
-            if ($message != '')
-            {
+        } else {
+            if ($message != '') {
                 $message .= PHP_EOL;
             }
-            $message .= trans('canducci-zipcode::zipcode.invalid_argument_renew');
+            $message .= 'ZipCode argument renew is invalid';
         }
-        
-        if ($message === '')
-        {
+        if ($message === '') {
             $valueInfo   = $this->getZipCodeInfo();
-            if ($valueInfo === null) 
-            {
+            if ($valueInfo === null) {
                 return null;
             }
-
             return new ZipCodeInfo($valueInfo);
-
         }
-
         throw new ZipCodeException($message);
-
     }
 
     /**
-     * return JSON Javascript
-     *
-     * @return JSON Javascript
-     * @throws ZipCodeException
+     * @return null|string
      */
-    private function getZipCodeInfo()
+    private function getZipCodeInfo(): ?string
     {
-
         $this->renew();
-
-        if ($this->cacheManager->has('zipcode_'.$this->value))
-        {            
-            $getCache = $this->cacheManager->get('zipcode_'.$this->value);            
-            if (isset($getCache) && is_array($getCache))
-            {   
-                if (isset($getCache['erro']) && $getCache['erro'] == true)
-                {
+        if ($this->cache->has('zipcode_' . $this->value)) {
+            $getCache = $this->cache->get('zipcode_' . $this->value);
+            if (isset($getCache) && is_array($getCache)) {
+                if (isset($getCache['erro']) && $getCache['erro'] == true) {
                     return null;
                 }
                 return json_encode($getCache, JSON_PRETTY_PRINT);
             }
-        }
-        else
-        {                                    
-            $response = $this->clientInterface->get($this->url());                
-            if ($response->getStatusCode() === 200)
-            {
-                $getResponse = $response->json();                                               
-                $this->cacheManager->put('zipcode_' . $this->value, $getResponse, 86400);                
-                if (isset($getResponse['erro']) && $getResponse['erro'] == true)
-                {
+        } else {
+            $response = $this->request->get($this->url());
+            if ($response && $response->getStatusCode() === 200) {
+                $getResponse = $response->getArray();
+                $this->cache->set('zipcode_' . $this->value, $getResponse, 86400);
+                if (isset($getResponse['erro']) && $getResponse['erro'] == true) {
                     return null;
-                }                
-                return json_encode($getResponse, JSON_PRETTY_PRINT);
-            }                       
+                }
+                return json_encode($getResponse);
+            }
         }
         return null;
-
-    }    
+    }
 
     /**
-     * remove item from cache
-     *
-     * @return void
+     * @return mixed
      */
-    private function renew()
+    private function renew(): ZipCode
     {
-
-        if ($this->renew && (is_null($this->value) === false)) 
-        {           
-            if ($this->cacheManager->has('zipcode_' . $this->value))
-            {
-                $this->cacheManager->forget('zipcode_' . $this->value);
-            }           
-            $this->renew = false;  
+        if ($this->renew && (is_null($this->value) === false)) {
+            if ($this->cache->has('zipcode_' . $this->value)) {
+                $this->cache->delete('zipcode_' . $this->value);
+            }
+            $this->renew = false;
         }
-
+        return $this;
     }
 
     /**
-     * get url web service
-     *
-     * @return string
+     * @return mixed
      */
-    private function url() 
+    private function url(): string
     {
-
-        return str_replace('[cep]', $this->value, 'http://viacep.com.br/ws/[cep]/json/');
-
+        return str_replace('[cep]', $this->value, 'https://viacep.com.br/ws/[cep]/json/');
     }
-
-
 }

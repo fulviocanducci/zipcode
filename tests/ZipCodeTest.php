@@ -1,165 +1,222 @@
 <?php
 
-$dir1 = str_replace('tests','src/Canducci/ZipCode/ZipCodeTrait.php', __DIR__);
-$dir2 = str_replace('tests','src/Canducci/ZipCode/ZipCodeException.php', __DIR__);
+declare(strict_types=1);
 
-include $dir1;
-include $dir2;
-
-use GuzzleHttp\ClientInterface;
-use GuzzleHttp\Client;
-
+use Canducci\ZipCode\ZipCode;
+use Canducci\ZipCode\ZipCodeAddress;
+use Canducci\ZipCode\ZipCodeAddressInfo;
+use Canducci\ZipCode\ZipCodeInfo;
+use Canducci\ZipCode\ZipCodeRequest;
+use Canducci\ZipCode\ZipCodeTrait;
+use PhpExtended\SimpleCache\SimpleCacheFilesystem;
+use PHPUnit\Framework\TestCase;
 
 class ZipCodeTest extends TestCase
 {
-    use Canducci\ZipCode\ZipCodeTrait;
-    
-    public function setUp()
-    {       
-        parent::setUp();        
-    }
+    use ZipCodeTrait;
 
-    /**
-     * @return GuzzleHttp\ClientInterface     
-     */
-    public function getGuzzleHttpClient() 
+    private ZipCode $zipCode;
+    private ZipCodeAddress $address;
+
+    protected function setUp(): void
     {
-        return $this->app->make('GuzzleHttp\ClientInterface');
+        $this->setZipCodeInstance();
+        $this->setZipCodeAddressInstance();
     }
 
-    /**
-     * @return Canducci\ZipCode\ZipCode
-     */
-    public function getZipCodeInstance() 
+    public function setZipCodeInstance(): void
     {
-        return new Canducci\ZipCode\ZipCode(new Illuminate\Cache\CacheManager(app()),
-            $this->getGuzzleHttpClient());
+        if (realpath(__DIR__ . '/tmp') === false) {
+            mkdir(__DIR__ . '/tmp');
+        }
+        $path = realpath(__DIR__ . '/tmp');
+        $this->zipCode = new ZipCode(
+            new SimpleCacheFilesystem($path),
+            new ZipCodeRequest()
+        );
     }
 
-    /**
-     *
-     */
-    public function getZipCodeInfoInstance()
+    public function setZipCodeAddressInstance(): void
     {
-        $zipCode = $this->getZipCodeInstance();
-        return $zipCode->find('01414000');
+        $this->address = new ZipCodeAddress(new ZipCodeRequest());
     }
 
-    /**
-     * Test of Instance
-     */
-    public function testInstance()
-    {                
-        $this->assertInstanceOf('Canducci\ZipCode\Contracts\ZipCodeContract',
-            $this->getZipCodeInstance());
-
-    }
-
-    /**
-     * Test Facade
-     */
-    public function testFacadeToZipCodeInfoInstance()
+    public function testZipCode(): void
     {
-        $this->app->bind('GuzzleHttp\ClientInterface','GuzzleHttp\Client');
-        $this->assertInstanceOf('Canducci\ZipCode\Contracts\ZipCodeInfoContract',
-            \Canducci\ZipCode\Facades\ZipCode::find('01414000'));
-
+        $this->assertNotNull($this->zipCode);
+        $this->assertInstanceOf(ZipCode::class, $this->zipCode);
     }
 
-    /**
-     * Test Helper
-     */
-    public function testHelperToZipCodeInfoInstance()
+    public function testZipCodeAddress(): void
     {
-        $this->assertInstanceOf('Canducci\ZipCode\Contracts\ZipCodeInfoContract',
-            zipcode('01414000'));
+        $this->assertNotNull($this->address);
+        $this->assertInstanceOf(ZipCodeAddress::class, $this->address);
     }
 
-    /**
-     * Test Traits
-     */
-    public function testTraitToZipCodeInfoInstance()
+
+    public function testZipCodeInfo(): void
     {
-        $this->assertInstanceOf('Canducci\ZipCode\Contracts\ZipCodeInfoContract',
-            $this->zipcode('01414000'));
+        $zipCodeInfo = $this->zipCode->find('01001000');
+        $this->assertNotNull($zipCodeInfo);
+        $this->assertInstanceOf(ZipCodeInfo::class, $zipCodeInfo);
     }
 
-    /**
-     * Tests the same return null
-     */
-    public function testZipCodeInfoNull()
+    public function testZipCodeInfoTestMethods(): void
     {
-        $zipCode = $this->getZipCodeInstance();
-        $this->assertTrue(is_null($zipCode->find('00000000')));
+        $zipCodeInfo = $this->zipCode->find('01001000');
+        $this->assertNotNull($zipCodeInfo);
+        $this->assertIsString($zipCodeInfo->getJson());
+        $this->assertIsArray($zipCodeInfo->getArray());
+        $this->assertIsObject($zipCodeInfo->getObject());
     }
 
-    /**
-     * Tests the return not null
-     */
-    public function testZipCodeInfoNotNull()
+    public function testZipCodeAddressInfo(): void
     {
-        $zipCode = $this->getZipCodeInstance();
-        $this->assertFalse(is_null($zipCode->find('01414000')));
+        $zipCodeAddressInfo = $this->address->find('sp', 'são paulo', 'ave');
+        $this->assertNotNull($zipCodeAddressInfo);
+        $this->assertInstanceOf(ZipCodeAddressInfo::class, $zipCodeAddressInfo);
     }
 
-    /**
-     * Tests the return JSON Javascript
-     */
-    public function testZipCodeInfoReturnJSON()
+    public function testZipCodeAddressInfoTestMethods(): void
     {
-        $zipCodeInfo = $this->getZipCodeInfoInstance();
-        $this->assertJson($zipCodeInfo->getJson());
-
+        $zipCodeAddressInfo = $this->address->find('sp', 'são paulo', 'ave');
+        $this->assertNotNull($zipCodeAddressInfo);
+        $this->assertIsString($zipCodeAddressInfo->getJson());
+        $this->assertIsArray($zipCodeAddressInfo->getArray());
+        $this->assertIsArray($zipCodeAddressInfo->getObject());
+        $this->assertIsNumeric($zipCodeAddressInfo->count());
     }
 
-    /**
-     * Tests the return Array
-     */
-    public function testZipCodeInfoReturnArray()
+    public function testZipCodeReturnCep(): void
     {
-        $zipCodeInfo = $this->getZipCodeInfoInstance();
-        $this->assertInternalType('array',
-            $zipCodeInfo->getArray());
+        $zipCodeInfo = $this->zipCode->find('01001000');
+        $data = $zipCodeInfo->getArray();
+        $this->assertIsArray($data);
     }
 
-    /**
-     * Tests the return Key of Array
-     */
-    public function testZipCodeInfoKeyOfArray()
+
+    public function testZipCodeAddressReturnCeps(): void
     {
-        $zipCodeInfo = $this->getZipCodeInfoInstance();
-        $this->assertArrayHasKey('cep',
-            $zipCodeInfo->getArray());
+        $zipCodeAddressInfo = $this->address->find('sp', 'são paulo', 'ave');
+        $datas = $zipCodeAddressInfo->getArray();
+        $this->assertIsArray($datas);
+        $this->assertEquals(50, $zipCodeAddressInfo->count());
+        $this->assertArrayHasKey('cep', $datas[0]);
     }
 
-    /**
-     * Tests thrown messages "Invalid Zip"
-     */
-    public function testZipCodeException()
+    public function testZipCodeAddressTestKeys(): void
     {
-        $zipCode = $this->getZipCodeInstance();
-        $this->setExpectedException('Canducci\ZipCode\ZipCodeException',
-            'Invalid Zip. The format valid: 01001-000 or 01001000');
-        $zipCode->find('');
+        $zipCodeAddressInfo = $this->address->find('sp', 'são paulo', 'ave');
+        $datas = $zipCodeAddressInfo->getArray();
+        $this->assertArrayHasKey('cep', $datas[0]);
+        $this->assertArrayHasKey('logradouro', $datas[0]);
+        $this->assertArrayHasKey('complemento', $datas[0]);
+        $this->assertArrayHasKey('bairro', $datas[0]);
+        $this->assertArrayHasKey('localidade', $datas[0]);
+        $this->assertArrayHasKey('uf', $datas[0]);
+        $this->assertArrayHasKey('ddd', $datas[0]);
+        $this->assertArrayHasKey('siafi', $datas[0]);
+        $this->assertArrayHasKey('ibge', $datas[0]);
+        $this->assertArrayHasKey('gia', $datas[0]);
     }
 
-    /**
-     * Tests thrown messages "Invalid Zip"
-     */
-    public function testZipCodeSecondParameterException()
+    public function testZipCodeFieldObject(): void
     {
-        $zipCode = $this->getZipCodeInstance();
-        $this->setExpectedException('Canducci\ZipCode\ZipCodeException',
-            'Error in the second parameter should be true or false');
-        $zipCode->find('19200000', '');
+        $zipCodeInfo = $this->zipCode->find('01001000');
+        $model = $zipCodeInfo->getObject();
+
+        $this->assertNotNull($model->cep);
+        $this->assertNotNull($model->logradouro);
+        $this->assertNotNull($model->complemento);
+        $this->assertNotNull($model->bairro);
+        $this->assertNotNull($model->localidade);
+        $this->assertNotNull($model->uf);
+        $this->assertNotNull($model->ddd);
+        $this->assertNotNull($model->siafi);
+        $this->assertNotNull($model->ibge);
+        $this->assertNotNull($model->gia);
     }
 
-    /**
-     * Tests no found
-     */
-    public function testZipCodeInfoNoFind()
+    public function testZipCodeFieldArray(): void
     {
-        $zipCode = $this->getZipCodeInstance();
-        $this->assertTrue(is_null($zipCode->find('11111111')));
+        $zipCodeInfo = $this->zipCode->find('01001000');
+        $model = $zipCodeInfo->getArray();
+
+        $this->assertNotNull($model['cep']);
+        $this->assertNotNull($model['logradouro']);
+        $this->assertNotNull($model['complemento']);
+        $this->assertNotNull($model['bairro']);
+        $this->assertNotNull($model['localidade']);
+        $this->assertNotNull($model['uf']);
+        $this->assertNotNull($model['ddd']);
+        $this->assertNotNull($model['siafi']);
+        $this->assertNotNull($model['ibge']);
+        $this->assertNotNull($model['gia']);
+    }
+
+    public function testZipCodeTestValues(): void
+    {
+        $zipCodeInfo = $this->zipCode->find('01001000');
+        $model = $zipCodeInfo->getArray();
+        $this->assertEquals($model['cep'], '01001-000');
+        $this->assertEquals($model['logradouro'], 'Praça da Sé');
+        $this->assertEquals($model['complemento'], 'lado ímpar');
+        $this->assertEquals($model['bairro'], 'Sé');
+        $this->assertEquals($model['localidade'], 'São Paulo');
+        $this->assertEquals($model['uf'], 'SP');
+        $this->assertEquals($model['ddd'], '11');
+        $this->assertEquals($model['siafi'], '7107');
+        $this->assertEquals($model['ibge'], '3550308');
+        $this->assertEquals($model['gia'], '1004');
+    }
+
+    public function testZipCodeFunctionFieldObject(): void
+    {
+        $zipCodeInfo = zipcode('01001000');
+        $model = $zipCodeInfo->getObject();
+
+        $this->assertNotNull($model->cep);
+        $this->assertNotNull($model->logradouro);
+        $this->assertNotNull($model->complemento);
+        $this->assertNotNull($model->bairro);
+        $this->assertNotNull($model->localidade);
+        $this->assertNotNull($model->uf);
+        $this->assertNotNull($model->ddd);
+        $this->assertNotNull($model->siafi);
+        $this->assertNotNull($model->ibge);
+        $this->assertNotNull($model->gia);
+    }
+
+    public function testZipCodeFunctionFieldArray(): void
+    {
+        $zipCodeInfo = zipcode('01001000');
+        $model = $zipCodeInfo->getArray();
+
+        $this->assertNotNull($model['cep']);
+        $this->assertNotNull($model['logradouro']);
+        $this->assertNotNull($model['complemento']);
+        $this->assertNotNull($model['bairro']);
+        $this->assertNotNull($model['localidade']);
+        $this->assertNotNull($model['uf']);
+        $this->assertNotNull($model['ddd']);
+        $this->assertNotNull($model['siafi']);
+        $this->assertNotNull($model['ibge']);
+        $this->assertNotNull($model['gia']);
+    }
+
+    public function testZipCodeFunctionTestValues(): void
+    {
+        $zipCodeInfo = zipcode('01001-000');
+        $model = $zipCodeInfo->getArray();
+        $this->assertEquals($model['cep'], '01001-000');
+        $this->assertEquals($model['logradouro'], 'Praça da Sé');
+        $this->assertEquals($model['complemento'], 'lado ímpar');
+        $this->assertEquals($model['bairro'], 'Sé');
+        $this->assertEquals($model['localidade'], 'São Paulo');
+        $this->assertEquals($model['uf'], 'SP');
+        $this->assertEquals($model['ddd'], '11');
+        $this->assertEquals($model['siafi'], '7107');
+        $this->assertEquals($model['ibge'], '3550308');
+        $this->assertEquals($model['gia'], '1004');
     }
 }
